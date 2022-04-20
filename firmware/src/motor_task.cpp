@@ -111,7 +111,9 @@ void MotorTask::run() {
         motor.loopFOC();
 
         if (xQueueReceive(queue_, &config, 0) == pdTRUE) {
+#ifdef DEBUG_KNOB_CFG
             Serial.println("Got new config");
+#endif
             current_detent_center = motor.shaft_angle;
 
             // Update derivative factor of torque controller based on detent width.

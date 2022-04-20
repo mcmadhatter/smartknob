@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
-
+#include <vector>
 #include "knob_data.h"
 #include "task.h"
 

@@ -19,9 +19,20 @@ InterfaceTask interface_task = InterfaceTask(1, motor_task);
 // CRGB leds[1];
 
 static QueueHandle_t knob_state_debug_queue;
+static KnobConfig currKnobCfg;
 
 void setup() {
   Serial.begin(115200);
+  
+  if (!SPIFFS.begin(true))
+  {
+    Serial.println("An Error has occurred while mounting SPIFFS");
+  }
+  else
+  {
+    delay(500);
+    Serial.println("SPIFFS started");
+  }
 
   motor_task.begin();
   interface_task.begin();
@@ -32,8 +43,7 @@ void setup() {
   // Connect display to motor_task's knob state feed
   motor_task.addListener(display_task.getKnobStateQueue());
   #endif
-
-
+  
   // Create a queue and register it with motor_task to print knob state to serial (see loop() below)
   knob_state_debug_queue = xQueueCreate(1, sizeof(KnobState));
   assert(knob_state_debug_queue != NULL);

@@ -5,6 +5,10 @@
 
 #include "motor_task.h"
 #include "task.h"
+#include "SPIFFS.h"
+#include <ArduinoJson.h>
+
+#define KNOB_CFG_PATH "/knob.jsn"
 
 class InterfaceTask : public Task<InterfaceTask>, public ace_button::IEventHandler {
     friend class Task<InterfaceTask>; // Allow base Task to invoke protected run()
