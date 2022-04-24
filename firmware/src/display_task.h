@@ -1,6 +1,6 @@
 #pragma once
 
-#if SK_DISPLAY
+#if (defined(SK_DISPLAY) && (SK_DISPLAY >0))
 
 #include <Arduino.h>
 #include <TFT_eSPI.h>

@@ -1,14 +1,19 @@
 #include <AceButton.h>
 
-#if SK_LEDS
+
+#if PIN_SDA >= 0 && PIN_SCL >= 0
+#include <Arduino.h>
+#include <Wire.h>
+#endif
+#if (defined(SK_LEDS) && (SK_LEDS >0))
 #include <FastLED.h>
 #endif
 
-#if SK_STRAIN
+#if (defined(SK_STRAIN) && (SK_STRAIN > 0))
 #include <HX711.h>
 #endif
 
-#if SK_ALS
+#if (defined(SK_ALS) && (SK_ALS >0))
 #include <Adafruit_VEML7700.h>
 #endif
 
@@ -19,15 +24,15 @@ using namespace ace_button;
 
 #define COUNT_OF(A) (sizeof(A) / sizeof(A[0]))
 
-#if SK_LEDS
+#if (defined(SK_LEDS) && (SK_LEDS >0))
 CRGB leds[NUM_LEDS];
 #endif
 
-#if SK_STRAIN
+#if (defined(SK_STRAIN) && (SK_STRAIN > 0))
 HX711 scale;
 #endif
 
-#if SK_ALS
+#if (defined(SK_ALS) && (SK_ALS >0))
 Adafruit_VEML7700 veml = Adafruit_VEML7700();
 #endif
 
@@ -99,7 +104,7 @@ static KnobConfig configs[] = {
         127,
         1 * PI / 180,
         1,
-        1,
+        10,
         1.1,
         "Fine values\nWith detents",
     },
@@ -108,7 +113,7 @@ static KnobConfig configs[] = {
         0,
         8.225806452 * PI / 180,
         2,
-        1,
+        10,
         1.1,
         "Coarse values\nStrong detents",
     },
@@ -117,14 +122,14 @@ static KnobConfig configs[] = {
         0,
         8.225806452 * PI / 180,
         0.2,
-        1,
+        10,
         1.1,
         "Coarse values\nWeak detents",
     },
 };
 
 InterfaceTask::InterfaceTask(const uint8_t task_core, MotorTask& motor_task, DisplayTask* display_task) : Task("Interface", 4048, 1, task_core), motor_task_(motor_task), display_task_(display_task) {
-    #if SK_DISPLAY
+    #if (defined(SK_DISPLAY) && (SK_DISPLAY >0))
         assert(display_task != nullptr);
     #endif
 }
@@ -150,7 +155,7 @@ void InterfaceTask::run() {
         button_prev.getButtonConfig()->setIEventHandler(this);
     #endif
     
-    #if SK_LEDS
+    #if (defined(SK_LEDS) && (SK_LEDS >0))
         FastLED.addLeds<SK6812, PIN_LED_DATA, GRB>(leds, NUM_LEDS);
     #endif
 
@@ -158,11 +163,11 @@ void InterfaceTask::run() {
         Wire.begin(PIN_SDA, PIN_SCL);
         Wire.setClock(400000);
     #endif
-    #if SK_STRAIN
+    #if (defined(SK_STRAIN) && (SK_STRAIN > 0))
         scale.begin(38, 2);
     #endif
 
-    #if SK_ALS
+    #if (defined(SK_ALS) && (SK_ALS >0))
         if (veml.begin()) {
             veml.setGain(VEML7700_GAIN_2);
             veml.setIntegrationTime(VEML7700_IT_400MS);
@@ -189,7 +194,7 @@ void InterfaceTask::run() {
             }
         }
 
-        #if SK_ALS
+        #if (defined(SK_ALS) && (SK_ALS >0))
             const float LUX_ALPHA = 0.005;
             static float lux_avg;
             float lux = veml.readLux();
@@ -201,7 +206,7 @@ void InterfaceTask::run() {
             }
         #endif
 
-        #if SK_STRAIN
+        #if (defined(SK_STRAIN) && (SK_STRAIN > 0))
             // TODO: calibrate and track (long term moving average) zero point (lower); allow calibration of set point offset
             const int32_t lower = 950000;
             const int32_t upper = 1800000;
@@ -232,7 +237,7 @@ void InterfaceTask::run() {
             } else {
                 Serial.println("HX711 not found.");
 
-                #if SK_LEDS
+                #if (defined(SK_LEDS) && (SK_LEDS >0))
                     for (uint8_t i = 0; i < NUM_LEDS; i++) {
                         leds[i] = CRGB::Red;
                     }
@@ -243,15 +248,15 @@ void InterfaceTask::run() {
 
         uint16_t brightness = UINT16_MAX;
         // TODO: brightness scale factor should be configurable (depends on reflectivity of surface)
-        #if SK_ALS
+        #if (defined(SK_ALS) && (SK_ALS >0))
             brightness = (uint16_t)CLAMP(lux_avg * 13000, (float)1280, (float)UINT16_MAX);
         #endif
 
-        #if SK_DISPLAY
+        #if (defined(SK_DISPLAY) && (SK_DISPLAY >0))
             display_task_->setBrightness(brightness); // TODO: apply gamma correction
         #endif
 
-        #if SK_LEDS
+        #if (defined(SK_LEDS) && (SK_LEDS >0))
             for (uint8_t i = 0; i < NUM_LEDS; i++) {
                 leds[i].setHSV(200 * press_value_unit, 255, brightness >> 8);
 
