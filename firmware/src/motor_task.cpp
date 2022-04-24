@@ -2,7 +2,9 @@
 #include <sensors/MagneticSensorI2C.h>
 
 #include "motor_task.h"
+#if (defined(SENSOR_MT6701) && (SENSOR_MT6701 >0))
 #include "mt6701_sensor.h"
+#endif
 #include "tlv_sensor.h"
 #include "util.h"
 
@@ -28,12 +30,16 @@ MotorTask::~MotorTask() {}
 BLDCMotor motor = BLDCMotor(1);
 BLDCDriver6PWM driver = BLDCDriver6PWM(PIN_UH, PIN_UL, PIN_VH, PIN_VL, PIN_WH, PIN_WL);
 
-#if SENSOR_TLV
+#if (defined(SENSOR_TLV) && (SENSOR_TLV > 0))
     TlvSensor encoder = TlvSensor();
-#elif SENSOR_MT6701
+#elif (defined(SENSOR_MT6701) && (SENSOR_MT6701 > 0))
     MT6701Sensor encoder = MT6701Sensor();
+#elif (defined(SENSOR_AS5048A) && (SENSOR_AS5048A > 0))
+    MagneticSensorPWM encoder = MagneticSensorPWM(2, 4, 904);
+#else
+    #error "No Sensor Defined"
 #endif
-// MagneticSensorI2C tlv = MagneticSensorI2C(AS5600_I2C);
+
 
 Commander command = Commander(Serial);
 
@@ -49,24 +55,25 @@ void MotorTask::run() {
     // So this value is based on experimentation.
     // TODO: dig into SimpleFOC calibration and find/fix the issue
     // float zero_electric_offset = -0.6; // original proto
-    //float zero_electric_offset = 0.4; // handheld 1
+    // float zero_electric_offset = 0.4; // handheld 1
     // float zero_electric_offset = -0.8; // handheld 2
     // float zero_electric_offset = 2.93; //0.15; // 17mm test
     // float zero_electric_offset = 0.66; // 15mm handheld
-    float zero_electric_offset = 7.34;
+    //float zero_electric_offset = 7.34;
+    float zero_electric_offset = 4.42 ; //GBM2804R
     Direction foc_direction = Direction::CW;
     motor.pole_pairs = 7;
 
     driver.voltage_power_supply = 5;
     driver.init();
 
-    #if SENSOR_TLV
+   #if (defined(SENSOR_TLV) && (SENSOR_TLV > 0))
     encoder.init(Wire, false);
     #endif
 
-    #if SENSOR_MT6701
+    #if (defined(SENSOR_MT6701) && (SENSOR_MT6701 > 0))
     encoder.init();
-    // motor.LPF_angle = LowPassFilter(0.05);
+   //   motor.LPF_angle = LowPassFilter(0.05); 
     #endif
     // motor.LPF_current_q = {0.01};
 
@@ -136,10 +143,10 @@ void MotorTask::run() {
 
         motor.voltage_limit = 0;
         motor.move(a);
-        // Serial.println("Did motor turn counterclockwise? Press Y to continue, otherwise change motor wiring and restart");
-        // while (Serial.read() != 'Y') {
-        //     delay(10);
-        // }
+         Serial.println("Did motor turn counterclockwise? Press Y to continue, otherwise change motor wiring and restart");
+         while (Serial.read() != 'Y') {
+             delay(10);
+         }
 
         Serial.println();
 

@@ -5,7 +5,7 @@
 #include "interface_task.h"
 #include "motor_task.h"
 
-#if SK_DISPLAY
+#if (defined(SK_DISPLAY) && (SK_DISPLAY >0))
 static DisplayTask display_task = DisplayTask(0);
 static DisplayTask* display_task_p = &display_task;
 #else
@@ -24,7 +24,7 @@ void setup() {
   motor_task.begin();
   interface_task.begin();
 
-  #if SK_DISPLAY
+  #if (defined(SK_DISPLAY) && (SK_DISPLAY >0))
   display_task.begin();
 
   // Connect display to motor_task's knob state feed
@@ -56,7 +56,7 @@ void loop() {
   if (millis() - last_stack_debug > 1000) {
     Serial.println("Stack high water:");
     Serial.printf("main: %d\n", uxTaskGetStackHighWaterMark(NULL));
-    #if SK_DISPLAY
+    #if (defined(SK_DISPLAY) && (SK_DISPLAY >0))
       Serial.printf("display: %d\n", uxTaskGetStackHighWaterMark(display_task.getHandle()));
     #endif
     Serial.printf("motor: %d\n", uxTaskGetStackHighWaterMark(motor_task.getHandle()));
