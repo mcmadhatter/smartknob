@@ -7,6 +7,9 @@
 #include "motor_task.h"
 #include "task.h"
 
+#include "spiffs_cfg.h"
+
+
 class InterfaceTask : public Task<InterfaceTask>, public ace_button::IEventHandler {
     friend class Task<InterfaceTask>; // Allow base Task to invoke protected run()
 
@@ -22,7 +25,7 @@ class InterfaceTask : public Task<InterfaceTask>, public ace_button::IEventHandl
     private:
         MotorTask& motor_task_;
         DisplayTask* display_task_;
-
+        SpiffsCfg spiffsCfg;
         int current_config_ = 0;
 
         void changeConfig(bool next);

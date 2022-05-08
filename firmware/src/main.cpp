@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include <SimpleFOC.h>
-
+#include <SPIFFS.h>
 #include "display_task.h"
 #include "interface_task.h"
 #include "motor_task.h"
@@ -20,6 +20,13 @@ static QueueHandle_t knob_state_debug_queue;
 
 void setup() {
   Serial.begin(115200);
+
+
+  if(!SPIFFS.begin())
+  {
+    Serial.println(F("SPIFFS mount failure"));
+  }
+
 
   motor_task.begin();
   interface_task.begin();
