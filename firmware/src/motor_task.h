@@ -5,7 +5,7 @@
 
 #include "knob_data.h"
 #include "task.h"
-
+#include "spiffs_cfg.h"
 
 enum class CommandType {
     CONFIG,
@@ -46,4 +46,6 @@ class MotorTask : public Task<MotorTask> {
         std::vector<QueueHandle_t> listeners_;
 
         void publish(const KnobState& state);
+
+        SpiffsCfg spiffsCfg;
 };

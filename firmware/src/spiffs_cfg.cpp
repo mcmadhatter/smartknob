@@ -1,16 +1,16 @@
 /**
  * @file spiffs_cfg.cpp
- * @brief Provides a way to read/write configuration items JSON files that 
+ * @brief Provides a way to read/write configuration items JSON files that
  *        are located on the ESP32 SPIFFS file system.
  * @version 0.1
  * @date 2022-05-08
- * 
+ *
  */
 #include "spiffs_cfg.h"
 
 SemaphoreHandle_t SpiffsCfg::mutex_;
 bool SpiffsCfg::initComplete = false;
-
+StaticJsonDocument<300> SpiffsCfg::jsonDoc;
 /**
  * @brief Construct a new Spiffs Cfg:: Spiffs Cfg object
  *        If this is the first time the function has been
@@ -44,7 +44,7 @@ SpiffsCfg::~SpiffsCfg()
  *        all avialable knob configurations. There can be between 1
  *        and N knob configuraion entires. To minimise memory usage,
  *        and maximise compatibility, we will deserialize each one
- *        one at a time. This takes 258 byes, so making the knobJSONDoc
+ *        one at a time. This takes 258 byes, so making the jsonDoc
  *        object 300 bytes gives some headroom for safety. This also
  *        allows for the Knobs.jsn config to be changed by another
  *        process during run time, e.g. to add or remove a config.
@@ -74,9 +74,9 @@ bool SpiffsCfg::GetKnobConfig(const int cfgIdx, KnobConfig *knobCfg)
         }
         else
         {
+            SemaphoreGuard lock(mutex_);
             int idx = 0U;
             bool contProcessing = true;
-            SemaphoreGuard lock(mutex_);
 
             /* Although the Knob.jsn only conatins the arry of knob configrations,
                mke sure we start the json deserializing at the correct place. */
@@ -85,26 +85,24 @@ bool SpiffsCfg::GetKnobConfig(const int cfgIdx, KnobConfig *knobCfg)
             {
                 /* There can be between 1 and N knob configuraion entires. To minimise
                    memory usage, and maximise compatibility, we will deserialize each one
-                   one at a time. This takes 258 byes, so making the buffer 300 bytes allows
-                   some overhead. This also gives the flexibility to change the number of
+                   one at a time.This also gives the flexibility to change the number of
                    knob configurations, and to support an unlimited number of knob configurations. */
-                StaticJsonDocument<300> knobJSONDoc;
-                DeserializationError error = deserializeJson(knobJSONDoc, file);
+                DeserializationError error = deserializeJson(jsonDoc, file);
                 if (!error)
                 {
-                    /* Only copy if we are interested in the last index, or if the 
-                       indexes match. The extra overhead for copying the configuration 
+                    /* Only copy if we are interested in the last index, or if the
+                       indexes match. The extra overhead for copying the configuration
                        for every entry (when looking for the last entry) is less than
                        having to deserialize the entire array twice. */
                     if ((idx == cfgIdx) || (cfgIdx == LastCfgIdx))
                     {
-                        knobCfg->num_positions = knobJSONDoc["num_positions"];
-                        knobCfg->position = knobJSONDoc["position"];
-                        knobCfg->position_width_radians = knobJSONDoc["position_width_radians"];
-                        knobCfg->detent_strength_unit = knobJSONDoc["detent_strength_unit"];
-                        knobCfg->endstop_strength_unit = knobJSONDoc["endstop_strength_unit"];
-                        knobCfg->snap_point = knobJSONDoc["snap_point"];
-                        strlcpy(knobCfg->descriptor, knobJSONDoc["descriptor"] | "unkown", 50);
+                        knobCfg->num_positions = jsonDoc["num_positions"];
+                        knobCfg->position = jsonDoc["position"];
+                        knobCfg->position_width_radians = jsonDoc["position_width_radians"];
+                        knobCfg->detent_strength_unit = jsonDoc["detent_strength_unit"];
+                        knobCfg->endstop_strength_unit = jsonDoc["endstop_strength_unit"];
+                        knobCfg->snap_point = jsonDoc["snap_point"];
+                        strlcpy(knobCfg->descriptor, jsonDoc["descriptor"] | "unkown", 50);
 
                         returnVal = true;
 
@@ -228,3 +226,89 @@ bool SpiffsCfg::DeleteKnobConfig(const int cfgIdx) { return false; }
  * @return false on failure
  */
 bool SpiffsCfg::AppendKnobConfig(KnobConfig knobCfg) { return false; }
+
+/**
+ * @brief Reads the Motor config to the Motor.jsn file
+ * 
+ * @param motorCfg A pointer to a MotorConfig struct to copy the 
+ *        data from the Motor.jsn file to.
+ * @return true on success
+ * @return false on failure
+ */
+bool SpiffsCfg::GetMotorConfig(MotorConfig *motorConfig)
+{
+    bool returnValue = false;
+
+    if (motorConfig == nullptr)
+    {
+        Serial.println(F("Unable to get motor config, null GetMotorConfig pointer"));
+    }
+    else
+    {
+        File file = SPIFFS.open("/Motor.jsn", "r");
+
+        if (!file)
+        {
+            Serial.println(F("Failed to open motor config file"));
+        }
+        else
+        {
+            SemaphoreGuard lock(mutex_);
+           
+            DeserializationError error = deserializeJson(jsonDoc, file);
+            if (!error)
+            {
+                motorConfig->calibrated = jsonDoc["Calibrated"];
+                motorConfig->pole_pairs = jsonDoc["Pole Pairs"];
+                motorConfig->sensor_direction = jsonDoc["Clockwise"];
+                motorConfig->zero_electric_angle = jsonDoc["Zero Electric Angle"];
+
+                if (motorConfig->calibrated > 0)
+                {
+                    returnValue = true;
+                }
+            }
+            file.close();
+        }
+    }
+    return returnValue;
+}
+
+/**
+ * @brief Writes the specified Motor config to the Motor.jsn file
+ * 
+ * @param motorCfg A pointer to a MotorConfig struct containg the data to
+ *        save to the Motor.jsn file
+ * @return true on success
+ * @return false on failure
+ */
+bool SpiffsCfg::SetMotorConfig(MotorConfig *motorCfg)
+{
+    bool returnValue = false;
+
+    if (motorCfg == nullptr)
+    {
+        Serial.println(F("Unable to get motor config, null GetMotorConfig pointer"));
+    }
+    else
+    {
+        File file = SPIFFS.open("/Motor.jsn", "w");
+
+        if (!file)
+        {
+            Serial.println(F("Failed to open motor config file"));
+        }
+        else
+        {
+            SemaphoreGuard lock(mutex_);
+            jsonDoc["Direction Clockwise"] = motorCfg->sensor_direction;
+            jsonDoc["Pole Pairs"] = motorCfg->pole_pairs;
+            jsonDoc["Zero Electric Angle"] = motorCfg->zero_electric_angle;
+            jsonDoc["Calibrated"] = motorCfg->calibrated;
+            serializeJsonPretty(jsonDoc, file);
+            file.close();
+            returnValue = true;
+        }
+    }
+    return returnValue;
+}

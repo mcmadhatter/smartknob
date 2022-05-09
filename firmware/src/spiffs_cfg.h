@@ -4,6 +4,7 @@
 #include <SPIFFS.h>
 #include <ArduinoJson.h>
 #include "knob_data.h"
+#include "motor_data.h"
 #include "semaphore_guard.h"
 
 
@@ -18,10 +19,14 @@ public:
     bool AppendKnobConfig(KnobConfig knobCfg);
     bool GetNextKnobConfig(int *cfgIdx, KnobConfig *knobCfg);
     bool GetPreviousKnobConfig(int *cfgIdx, KnobConfig *knobCfg);
+
+    bool GetMotorConfig(MotorConfig* motorCfg);
+    bool SetMotorConfig(MotorConfig* motorCfg);
   
 
 private:
     static bool initComplete;
     static SemaphoreHandle_t mutex_;
+    static StaticJsonDocument<300> jsonDoc;
 };
 

@@ -7,6 +7,8 @@
 #endif
 #include "tlv_sensor.h"
 #include "util.h"
+#include "motor_data.h"
+
 
 static const float DEAD_ZONE_DETENT_PERCENT = 0.2;
 static const float DEAD_ZONE_RAD = 1 * _PI / 180;
@@ -18,7 +20,7 @@ static const float IDLE_CORRECTION_MAX_ANGLE_RAD = 5 * PI / 180;
 static const float IDLE_CORRECTION_RATE_ALPHA = 0.0005;
 
 
-MotorTask::MotorTask(const uint8_t task_core) : Task("Motor", 2048, 1, task_core) {
+MotorTask::MotorTask(const uint8_t task_core) : Task("Motor", 2560, 1, task_core) {
     queue_ = xQueueCreate(5, sizeof(Command));
     assert(queue_ != NULL);
 }
@@ -47,6 +49,34 @@ Commander command = Commander(Serial);
 void doMotor(char* cmd) { command.motor(&motor, cmd); }
 
 void MotorTask::run() {
+
+    bool calibrate = false;
+    MotorConfig motorCfg;
+    float zero_electric_offset = 7.34 ; //GBM2804R
+    Direction foc_direction = Direction::CW;
+    
+
+    if(!spiffsCfg.GetMotorConfig(&motorCfg))
+    {
+        calibrate = true;
+        motorCfg.zero_electric_angle = 1.0;
+        motorCfg.sensor_direction= Direction::CW;
+        motor.pole_pairs = 7;
+    }
+    else
+    {
+        motor.pole_pairs = motorCfg.pole_pairs;
+
+        Serial.print(F("zero_electric_angle:"));
+        Serial.println(motorCfg.zero_electric_angle);
+        Serial.print(F("foc_direction:"));
+        Serial.println(motorCfg.sensor_direction);
+        Serial.print(F("pole_pairs:"));
+        Serial.println(motor.pole_pairs);
+    }
+
+
+
     // Hardware-specific configuration:
     // TODO: make this easier to configure
     // Tune zero offset to the specific hardware (motor + mounted magnetic sensor).
@@ -60,14 +90,14 @@ void MotorTask::run() {
     // float zero_electric_offset = 2.93; //0.15; // 17mm test
     // float zero_electric_offset = 0.66; // 15mm handheld
     //float zero_electric_offset = 7.34;
-    float zero_electric_offset = 4.42 ; //GBM2804R
-    Direction foc_direction = Direction::CW;
-    motor.pole_pairs = 7;
+    //float zero_electric_offset = 4.42 ; //GBM2804R
+
+   
 
     driver.voltage_power_supply = 5;
     driver.init();
 
-   #if (defined(SENSOR_TLV) && (SENSOR_TLV > 0))
+    #if (defined(SENSOR_TLV) && (SENSOR_TLV > 0))
     encoder.init(Wire, false);
     #endif
 
@@ -100,19 +130,10 @@ void MotorTask::run() {
     encoder.update();
     delay(10);
 
-    motor.initFOC(zero_electric_offset, foc_direction);
+    motor.initFOC(motorCfg.zero_electric_angle, (Direction)motorCfg.sensor_direction);
 
-    bool calibrate = false;
+  
 
-    Serial.println("Press Y to run calibration");
-    uint32_t t = millis();
-    while (millis() - t < 3000) {
-        if (Serial.read() == 'Y') {
-            calibrate = true;
-            break;
-        }
-        delay(10);
-    }
     if (calibrate) {
         motor.controller = MotionControlType::angle_openloop;
         motor.pole_pairs = 1;
@@ -279,6 +300,16 @@ void MotorTask::run() {
             Serial.println("CCW");
         }
         Serial.printf("  pole pairs: %d\n", motor.pole_pairs);
+
+        motorCfg.calibrated = true;
+        motorCfg.pole_pairs = measured_pole_pairs;
+        motorCfg.sensor_direction = motor.sensor_direction;
+        motorCfg.zero_electric_angle = motor.zero_electric_angle;
+        if (!spiffsCfg.SetMotorConfig(&motorCfg))
+        {
+            Serial.println(F("Unable to write motorcfg"));
+        }
+
         delay(2000);
     }
 
